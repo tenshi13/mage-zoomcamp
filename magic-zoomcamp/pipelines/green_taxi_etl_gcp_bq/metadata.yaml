@@ -3,6 +3,24 @@ blocks:
   color: null
   configuration:
     file_source:
+      path: data_loaders/extract_taxi_data.py
+  downstream_blocks:
+  - transform_taxi_data
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: extract_taxi_data
+  retry_config: null
+  status: executed
+  timeout: null
+  type: data_loader
+  upstream_blocks: []
+  uuid: extract_taxi_data
+- all_upstream_blocks_executed: true
+  color: null
+  configuration:
+    file_source:
       path: transformers/transform_taxi_data.py
   downstream_blocks:
   - load_taxi_to_gcs_parq
@@ -19,24 +37,6 @@ blocks:
   upstream_blocks:
   - extract_taxi_data
   uuid: transform_taxi_data
-- all_upstream_blocks_executed: true
-  color: null
-  configuration:
-    file_source:
-      path: data_loaders/extract_taxi_data.py
-  downstream_blocks:
-  - transform_taxi_data
-  executor_config: null
-  executor_type: local_python
-  has_callback: false
-  language: python
-  name: extract_taxi_data
-  retry_config: null
-  status: executed
-  timeout: null
-  type: data_loader
-  upstream_blocks: []
-  uuid: extract_taxi_data
 - all_upstream_blocks_executed: true
   color: null
   configuration: {}
@@ -90,7 +90,7 @@ settings:
 spark_config: {}
 tags: []
 type: python
-updated_at: '2024-02-04 12:53:59'
+updated_at: '2024-02-04 13:15:54'
 uuid: green_taxi_etl_gcp_bq
 variables_dir: /home/src/mage_data/magic-zoomcamp
 widgets: []
