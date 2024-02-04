@@ -13,8 +13,6 @@ def load_data_from_api(*args, **kwargs):
     Loading data from https://github.com/DataTalksClub/nyc-tlc-data/releases/tag/green/download
     we only need 10/11/12 from 2020
     """""
-    url = 'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_2020-10.csv.gz'
-
     taxi_dtypes = {
         'VendorID': pd.Int64Dtype(),
         'passenger_count': pd.Int64Dtype(),
@@ -33,10 +31,22 @@ def load_data_from_api(*args, **kwargs):
         'total_amount': float,
         'congestion_surcharge': float 
     }
-
     parse_dates = ['lpep_pickup_datetime', 'lpep_dropoff_datetime']    
 
-    return pd.read_csv(url, sep=',', compression='gzip', dtype=taxi_dtypes, parse_dates=parse_dates)
+    target_years = [2020]
+    target_months = [10,11,12]
+    base_url = 'https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_' # 2020-10.csv.gz
+
+    df_out = pd.DataFrame() # EH: empty dataframe... forum says its bad practice?
+    for year in target_years:
+        for month in target_months:
+            url = f"{base_url}{year}-{month}.csv.gz"
+            print(f"Loading {url}")
+            df_slice = pd.read_csv(url, sep=',', compression='gzip', dtype=taxi_dtypes, parse_dates=parse_dates)
+            df_out = pd.concat([df_out, df_slice])
+            print(f"Total rows : {len(df_out.index)}")
+
+    return df_out
 
 
 @test
