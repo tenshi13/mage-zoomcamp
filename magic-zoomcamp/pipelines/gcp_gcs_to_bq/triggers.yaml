@@ -1,0 +1,13 @@
+# ref: https://docs.mage.ai/orchestration/triggers/configure-triggers-in-code
+triggers:
+- envs: []
+  last_enabled_at: 2024-02-04 13:53:39.258217+00:00
+  name: gcs_to_bq_via_trigger_yaml
+  pipeline_uuid: gcp_gcs_to_bq
+  schedule_interval: '0 5 * * *'
+  schedule_type: time
+  settings: {}
+  sla: null
+  start_time: 2024-02-04 05:00:00
+  status: active
+  variables: {}
