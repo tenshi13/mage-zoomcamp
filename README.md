@@ -1,87 +1,122 @@
-<div>
-<img src="https://github.com/mage-ai/assets/blob/main/mascots/mascots-shorter.jpeg?raw=true">
-</div>
+## Big Query sqls used in zoomcamp homework 3
+### Questions with 3 dash('-'), answers in 2 dash
 
-## Data Engineering Zoomcamp - Week 2
-
-Welcome to DE Zoomcamp with Mage! 
-
-Mage is an open-source, hybrid framework for transforming and integrating data. ✨
-
-In this module, you'll learn how to use the Mage platform to author and share _magical_ data pipelines. This will all be covered in the course, but if you'd like to learn a bit more about Mage, check out our docs [here](https://docs.mage.ai/introduction/overview). 
-
-[Get Started](https://github.com/mage-ai/mage-zoomcamp?tab=readme-ov-file#lets-get-started)
-[Assistance](https://github.com/mage-ai/mage-zoomcamp?tab=readme-ov-file#assistance)
-
-## Let's get started
-
-This repo contains a Docker Compose template for getting started with a new Mage project. It requires Docker to be installed locally. If Docker is not installed, please follow the instructions [here](https://docs.docker.com/get-docker/). 
-
-You can start by cloning the repo:
-
-```bash
-git clone https://github.com/mage-ai/mage-zoomcamp.git mage-zoomcamp
+### Setup
+```sql
+--- Data was preloaded to gcs bucket - ethanhobl_zoomcamp_week3
+--- Create an external table using the Green Taxi Trip Records Data for 2022.
+CREATE OR REPLACE EXTERNAL TABLE `vaulted-bit-411213.ny_taxi.external_green_2022_tripdata`
+OPTIONS (
+  format ="PARQUET",
+  uris = ['gs://ethanhobl_zoomcamp_week3/green_tripdata_2022-*.parquet']
+);
+--- Create a table in BQ using the Green Taxi Trip Records for 2022 (do not partition or cluster this table).
+CREATE OR REPLACE TABLE `vaulted-bit-411213.ny_taxi.nonpartitioned_green_2022_tripdata`
+AS SELECT * FROM `vaulted-bit-411213.ny_taxi.external_green_2022_tripdata`;
 ```
 
-Navigate to the repo:
-
-```bash
-cd mage-data-engineering-zoomcamp
+### Question 1
+```sql
+--- What is count of records for the 2022 Green Taxi Data??
+SELECT count(*) FROM `vaulted-bit-411213.ny_taxi.nonpartitioned_green_2022_tripdata`
+-- 840402
 ```
 
-Rename `dev.env` to simply `.env`— this will _ensure_ the file is not committed to Git by accident, since it _will_ contain credentials in the future.
+### Question 2
+```sql
+--- Write a query to count the distinct number of PULocationIDs for the entire dataset on both the tables.
+--- What is the estimated amount of data that will be read when this query is executed on the External Table and the Table?
+SELECT distinct(pu_location_id) 
+FROM `vaulted-bit-411213.ny_taxi.external_green_2022_tripdata`
+-- This query will process 0 B when run.
 
-Now, let's build the container
+SELECT distinct(pu_location_id) 
+FROM `vaulted-bit-411213.ny_taxi.nonpartitioned_green_2022_tripdata`
+-- This query will process 6.41 MB when run
+-- 0 MB for the External Table and 6.41MB for the Materialized Table
 
-```bash
-docker compose build
+--- How many records have a fare_amount of 0?
+select count(*) from
+`vaulted-bit-411213.ny_taxi.external_green_2022_tripdata`
+where fare_amount = 0
+-- 1622
 ```
 
-Finally, start the Docker container:
+### Question 3
+```sql
+--- What is the best strategy to make an optimized table in Big Query if your query will always 
+--- order the results by PUlocationID and filter based on lpep_pickup_datetime? (Create a new table with this strategy)
 
-```bash
-docker compose up
+-- the lpep_pickup_datetime was in nano seconds? need to cast it to micro seconds as nano seconds was not supported by BQ
+-- Partition by lpep_pickup_datetime Cluster on PUlocationID
+CREATE
+OR REPLACE TABLE `vaulted-bit-411213.ny_taxi.partitioned_green_2022_tripdata` 
+PARTITION BY DATE(cleaned_pickup_datetime) CLUSTER BY pu_location_id AS
+SELECT
+  *,
+  TIMESTAMP_MICROS(CAST(lpep_pickup_datetime / 1000 AS INT64)) AS cleaned_pickup_datetime,
+  TIMESTAMP_MICROS(CAST(lpep_dropoff_datetime / 1000 AS INT64)) AS cleaned_dropoff_datetime
+FROM
+  `vaulted-bit-411213.ny_taxi.external_green_2022_tripdata`;
 ```
 
-Now, navigate to http://localhost:6789 in your browser! Voila! You're ready to get started with the course. 
+### Question 5
+```sql
+--- Write a query to retrieve the distinct PULocationID between lpep_pickup_datetime 06/01/2022 and 06/30/2022 (inclusive)
+--- Use the materialized table you created earlier in your from clause and note the estimated bytes. Now change the table in the from 
+--- clause to the partitioned table you created for question 4 and note the estimated bytes processed. What are these values?
+--- Choose the answer which most closely matches.
+with cleaned_date_nonpartitioned AS (
+  select
+    *,
+    TIMESTAMP_MICROS(CAST(lpep_pickup_datetime / 1000 AS INT64)) AS cleaned_pickup_datetime,
+    TIMESTAMP_MICROS(CAST(lpep_dropoff_datetime / 1000 AS INT64)) AS cleaned_dropoff_datetime,
+    DATE(
+      TIMESTAMP_MICROS(CAST(lpep_pickup_datetime / 1000 AS INT64))
+    ) AS cleaned_pickup_date,
+    DATE(
+      TIMESTAMP_MICROS(CAST(lpep_dropoff_datetime / 1000 AS INT64))
+    ) AS cleaned_dropoff_date
+  from
+    `vaulted-bit-411213.ny_taxi.nonpartitioned_green_2022_tripdata`
+)
+select
+  distinct(pu_location_id)
+from
+  cleaned_date_nonpartitioned
+where
+  cleaned_pickup_date >= "2022-06-01"
+  and cleaned_dropoff_date <= '2022-06-30'
+-- This query will process 19.24 MB when run
 
-### What just happened?
-
-We just initialized a new mage repository. It will be present in your project under the name `magic-zoomcamp`. If you changed the varable `PROJECT_NAME` in the `.env` file, it will be named whatever you set it to.
-
-This repository should have the following structure:
-
+-- partitioned
+select distinct(pu_location_id)
+from `vaulted-bit-411213.ny_taxi.partitioned_green_2022_tripdata` 
+where 
+cleaned_pickup_datetime >= "2022-06-01" and
+cleaned_dropoff_datetime <= '2022-06-30'
+-- This query will process 10.92 MB when run.
+-- hmn... something wrong with my data maybe, did not get any close to the answers
+-- 19.24 for non-partitioned table and 10.92 MB for the partitioned table
 ```
-.
-├── mage_data
-│   └── magic-zoomcamp
-├── magic-zoomcamp
-│   ├── __pycache__
-│   ├── charts
-│   ├── custom
-│   ├── data_exporters
-│   ├── data_loaders
-│   ├── dbt
-│   ├── extensions
-│   ├── interactions
-│   ├── pipelines
-│   ├── scratchpads
-│   ├── transformers
-│   ├── utils
-│   ├── __init__.py
-│   ├── io_config.yaml
-│   ├── metadata.yaml
-│   └── requirements.txt
-├── Dockerfile
-├── README.md
-├── dev.env
-├── docker-compose.yml
-└── requirements.txt
+
+### Question 6
+```sql
+---  Where is the data stored in the External Table you created?
+-- GCP Bucket
 ```
 
-## Assistance
+### Question 7
+```sql
+---  It is best practice in Big Query to always cluster your data:
+-- True, and ideally couple with partitioning
+```
 
-1. [Mage Docs](https://docs.mage.ai/introduction/overview): a good place to understand Mage functionality or concepts.
-2. [Mage Slack](https://www.mage.ai/chat): a good place to ask questions or get help from the Mage team.
-3. [DTC Zoomcamp](https://github.com/DataTalksClub/data-engineering-zoomcamp/tree/main/week_2_workflow_orchestration): a good place to get help from the community on course-specific inquireies.
-4. [Mage GitHub](https://github.com/mage-ai/mage-ai): a good place to open issues or feature requests.
+### Question 8
+```sql
+--- No Points: Write a SELECT count(*) query FROM the materialized table you created. How many bytes does it estimate will be read? Why?
+SELECT count(*)
+from `vaulted-bit-411213.ny_taxi.partitioned_green_2022_tripdata` 
+-- This query will process 0 B when run
+-- partitioned tables store meta data, and bigquery will scan using the meta data that's why there is not cost
+```
